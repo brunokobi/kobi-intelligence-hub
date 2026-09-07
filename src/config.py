@@ -22,10 +22,14 @@ NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "")
 NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 
-# Modelo tabular final (experimento2026/models/tabular_final/), reaproveitado
-# via sys.path — ver src/score_preditivo.py.
-EXPERIMENTO2026_DIR = Path(os.environ.get("EXPERIMENTO2026_DIR", "/home/bruno/experimento2026"))
-MODELO_DIR = EXPERIMENTO2026_DIR / "models" / "tabular_final"
+# Modelo tabular final: scores.csv + metadata.json (gerados por
+# experimento2026/scripts/treinar_modelo_final.py). Em dev, lidos direto de
+# lá; em produção (container), copiados pra ./models/ e montados em
+# /app/models (ver Dockerfile/docker-compose.yml) — MODELO_DIR sobrepõe
+# tudo quando setado.
+_EXPERIMENTO2026_DIR = Path(os.environ.get("EXPERIMENTO2026_DIR", "/home/bruno/experimento2026"))
+MODELO_DIR = Path(os.environ["MODELO_DIR"]) if os.environ.get("MODELO_DIR") \
+    else _EXPERIMENTO2026_DIR / "models" / "tabular_final"
 
 # n8n — workflow que chama o Ollama pra redigir o parecer final.
 N8N_WEBHOOK_PARECER = os.environ.get("N8N_WEBHOOK_PARECER", "")

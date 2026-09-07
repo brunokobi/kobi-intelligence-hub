@@ -1,0 +1,17 @@
+services:
+  kobi-intelligence-hub:
+    build: .
+    container_name: kobi-intelligence-hub
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./models:/app/models:ro   # scores.csv + metadata.json do experimento2026 (só leitura)
+    networks:
+      - coolify
+    expose:
+      - "8000"
+
+networks:
+  coolify:
+    external: true

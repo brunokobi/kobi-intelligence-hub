@@ -5,3 +5,4 @@ __pycache__/
 scripts/*.env
 node_modules/
 dist/
+models/
