@@ -54,6 +54,14 @@ def buscar_dividas_ativas(lead_id: int) -> list[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
+def buscar_infracoes_ambientais(lead_id: int) -> list[dict]:
+    with _conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT orgao, tipo_infracao, valor_multa, status, data_auto, gravidade, "
+            "enquadramento FROM leads_infracoes_ambientais WHERE lead_id = %s", (lead_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+
 def buscar_processos_judiciais(lead_id: int, limite: int = 20) -> list[dict]:
     """Só os `limite` mais recentes por padrão — empresa com histórico
     grande (ex.: milhares de processos) não deve travar o dossiê."""
@@ -79,4 +87,5 @@ def montar_dados_factuais(cnpj: str) -> dict | None:
         "sancoes": buscar_sancoes(lead_id),
         "dividas_ativas": buscar_dividas_ativas(lead_id),
         "processos_judiciais": buscar_processos_judiciais(lead_id),
+        "infracoes_ambientais": buscar_infracoes_ambientais(lead_id),
     }

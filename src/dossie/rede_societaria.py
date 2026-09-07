@@ -66,3 +66,36 @@ def buscar_conexoes_societarias(cnpj: str, socios_alvo: list[dict], limite_empre
                 "socios_em_comum": nomes,
             })
     return conexoes
+
+
+# Mesmo limite de "hub de alto grau" usado na GNN homogênea do experimento2026
+# (`max_grau_endereco=20`, ver README lá) — prédio comercial/condomínio
+# empresarial grande compartilha endereço com centenas de empresas sem
+# relação nenhuma entre si; acima desse grau não é sinal, é ruído de dado.
+GRAU_MAXIMO_ENDERECO = 20
+
+
+def buscar_enderecos_compartilhados(cnpj: str, limite_empresas: int = 10) -> dict:
+    """Outras empresas no MESMO endereço do CNPJ alvo. Retorna também o grau
+    total do endereço (quantas empresas ao todo) — acima de
+    `GRAU_MAXIMO_ENDERECO` a lista vem vazia e `hub_alto_grau=True`, pra não
+    reportar como "sinal de risco" o que na verdade é só um prédio comercial
+    grande."""
+    query = """
+        MATCH (alvo:Empresa {id: $cnpj})-[:SEDIADA_EM]->(e:Endereco)
+        OPTIONAL MATCH (e)<-[:SEDIADA_EM]-(outra:Empresa)
+        WHERE outra.id <> $cnpj
+        RETURN e.id AS endereco_id, count(DISTINCT outra) AS grau_total,
+               collect(DISTINCT {cnpj: outra.id, sancionada: outra.sancionada_direto})[0..$limite] AS conectadas
+    """
+    with _driver() as driver, driver.session(database=config.NEO4J_DATABASE) as session:
+        row = session.run(query, cnpj=cnpj, limite=limite_empresas).single()
+        if row is None or row["endereco_id"] is None:
+            return {"grau_total": 0, "hub_alto_grau": False, "empresas": []}
+        grau_total = row["grau_total"]
+        hub_alto_grau = grau_total > GRAU_MAXIMO_ENDERECO
+        empresas = [] if hub_alto_grau else [
+            {"cnpj_conectada": c["cnpj"], "sancionada_direto": bool(c["sancionada"]) if c["sancionada"] is not None else False}
+            for c in row["conectadas"] if c["cnpj"] is not None
+        ]
+        return {"grau_total": grau_total, "hub_alto_grau": hub_alto_grau, "empresas": empresas}
