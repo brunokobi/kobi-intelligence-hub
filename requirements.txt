@@ -1,0 +1,9 @@
+# Reaproveita /home/bruno/experimento2026/.venv por enquanto (ver CLAUDE.md)
+# -- já tem pandas/numpy/xgboost/torch. Lista aqui documenta o que esse
+# venv precisou ganhar a mais (07/09/2026) e serve de base pra um venv
+# próprio quando for deployar em produção.
+fastapi
+uvicorn
+psycopg2-binary
+python-dotenv
+neo4j
