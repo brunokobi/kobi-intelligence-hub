@@ -61,7 +61,7 @@ const css = `
 .kobi-doc .section-label::before{ content:""; width:3px; height:12px; background:var(--green); border-radius:2px; display:inline-block; }
 .kobi-doc h2.section-title{ font-size:15px; margin:0 0 16px; color:#eafff1; font-weight:700; }
 .kobi-doc .risk-row{ display:flex; gap:20px; align-items:stretch; flex-wrap:wrap; }
-.kobi-doc .risk-score-card{ flex:0 0 180px; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:18px; text-align:center; }
+.kobi-doc .risk-score-card{ flex:0 0 180px; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:18px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
 .kobi-doc .risk-score-value{ font-family:var(--mono); font-size:36px; font-weight:700; color:var(--green); line-height:1; }
 .kobi-doc .risk-score-value.mid{ color:var(--amber); }
 .kobi-doc .risk-score-value.high{ color:var(--red); }
