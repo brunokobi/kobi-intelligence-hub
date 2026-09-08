@@ -1,9 +1,12 @@
 # Kobi Intelligence Hub
 
-Dossiê de due diligence (Markdown) sobre qualquer empresa da Grande Vitória (ES),
-a partir do CNPJ — cadastro, sanções, dívida ativa, processos judiciais,
-infrações ambientais, rede societária (grafo) e um parecer técnico redigido por
-IA, incluindo um score de risco preditivo (com ressalva metodológica obrigatória).
+Dossiê de due diligence (HTML estilizado) sobre qualquer empresa da Grande
+Vitória (ES), a partir do CNPJ — cadastro, sanções, dívida ativa, processos
+judiciais, infrações ambientais, rede societária (grafo) e um parecer técnico
+redigido por IA, incluindo um score de risco preditivo (com ressalva
+metodológica obrigatória, linkando o preprint do autor). Todo dossiê gerado
+fica salvo (cache no Postgres) — reabrir a mesma empresa mostra o dossiê já
+pronto, com a data de geração e um botão pra regerar.
 
 **Status: funcionando de ponta a ponta em produção.** Já integrado como botão
 **"🔍 Gerar dossiê com IA"** no dashboard público
@@ -19,8 +22,13 @@ Via API direto:
 ```bash
 curl -X POST "https://n8n-brunokobi.duckdns.org/webhook/kobi-dossie" \
   -H "Content-Type: application/json" \
-  -d '{"cnpj": "00000000000100"}'
-# -> {"markdown": "...", "cnpj": "..."} — leva ~30-90s (geração em CPU)
+  -d '{"cnpj": "00000000000100", "forcar": false}'
+# -> {"cache": bool, "cnpj": "...", "html": "...", "gerado_em": "..."}
+# forcar:false + já tem cache -> resposta instantânea (não chama o LLM)
+# forcar:false + nunca gerou, ou forcar:true -> gera do zero (~30-90s) e salva
+
+# só checar se já existe (nunca gera nada):
+curl "https://n8n-brunokobi.duckdns.org/webhook/kobi-dossie-cache?cnpj=00000000000100"
 ```
 
 ## Por que isso não é um projeto do zero

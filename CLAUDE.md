@@ -109,6 +109,52 @@ botão → confirm() → loading → dossiê renderizado. Como a página é
 pública, tem confirmação antes de rodar (evita clique repetido gerando
 carga à toa no Ollama compartilhado).
 
+## Status (08/09/2026) — cache de dossiês + saída em HTML estilizado
+
+Três mudanças pedidas pelo usuário, todas em produção:
+
+1. **Nota metodológica cita e linka o artigo do autor** — `score_preditivo.py`
+   expõe `artigo_url` (DOI "todas as versões" do preprint no Zenodo,
+   `10.5281/zenodo.21961062`) junto do `ressalva_metodologica`; o
+   `montar_html.js` monta o link `<a>` dentro do box de nota metodológica.
+2. **Cache de dossiê gerado** — tabela própria `kobi_dossies_cache` (cnpj PK,
+   html, gerado_em) no mesmo Postgres do Directus, criada on-demand no
+   startup da API (`src/dossie/cache.py`, `garantir_tabela()`). Endpoints:
+   `GET/POST /dossie/{cnpj}/cache`. O webhook `/kobi-dossie` aceita
+   `{"cnpj","forcar"}` — sem `forcar`, devolve cache se existir (instantâneo)
+   ou gera e salva; com `forcar:true`, sempre gera de novo e sobrescreve.
+   Novo webhook leve `GET /kobi-dossie-cache?cnpj=...` só checa se existe
+   (nunca aciona o LLM) — usado pelo dashboard ao abrir o modal da empresa,
+   pra já mostrar o dossiê salvo + data + botão "Regerar" sem precisar
+   clicar em nada. Ver `n8n/README.md` pro detalhe dos 2 webhooks/nós.
+3. **Saída em HTML estilizado** (não mais Markdown) — `n8n/montar_html.js`
+   substitui `montar_markdown.js` (removido), monta o HTML final seguindo o
+   modelo visual que o usuário forneceu (`dossie_cyber_suite.html`): CSS
+   escopado sob `.kobi-doc` (evita colidir com o CSS do dashboard onde é
+   injetado via innerHTML), badges no header, card de score com barra de
+   progresso, grid de fatos cadastrais, tabela de sócios, pills de
+   grafo/endereço, check-cards de auditoria (✓ verde quando limpo, ⚠ âmbar
+   quando tem achado), lista de processos, parecer com banner de conclusão
+   colorido por nível de risco. **Simplificação consciente**: o parecer do
+   LLM continua sendo 1 parágrafo único (prompt inalterado) em vez da
+   estrutura com bullets + "Considerações Finais" do mockup do usuário —
+   pedir esse nível de estrutura ao `llama3.1:8b` via Ollama arriscaria
+   quebrar o parsing; o resto do template (badges, score, tabelas, checks)
+   é 100% fiel ao modelo enviado.
+
+Testado de ponta a ponta com o CNPJ real do exemplo do usuário
+(`51517957000140`, CYBER SUITE): geração fresca (~41-85s) → cache
+instantâneo (0,6s, mesmo `gerado_em`) → regeneração forçada (novo
+`gerado_em`). Screenshot via Playwright confirmou o visual batendo com o
+mockup.
+
+**Achado, não é bug meu**: alguns `classe` de `leads_processos_judiciais`
+têm capitalização quebrada de vogais acentuadas (ex.: `"AçãO TRABALHISTA -
+RITO ORDINáRIO"`) — dado já vem assim do Postgres/DJEN, provavelmente algum
+`.upper()` aplicado antes da normalização Unicode em algum ponto da
+extração. Fora do escopo daqui (não é o dossiê que gera isso), mas fica
+registrado caso apareça de novo.
+
 ## Pendente
 
 1. **Tratamento de CNPJ não encontrado** no workflow n8n (hoje estoura
@@ -116,9 +162,12 @@ carga à toa no Ollama compartilhado).
 2. `.venv` próprio pro backend (em vez de reaproveitar o do
    `experimento2026` só localmente — o container já usa um `requirements.txt`
    isolado, isso é só uma pendência de dev local).
-4. Retreino periódico do modelo/scores (`experimento2026/scripts/
+3. Retreino periódico do modelo/scores (`experimento2026/scripts/
    treinar_modelo_final.py`) — hoje é manual; e re-sincronizar
    `models/scores.csv` pro container na VPS depois de cada retreino (hoje
    também manual, via rsync/scp).
-5. Rotacionar `DIRECTUS_DB_PASSWORD` e `NEO4J_PASSWORD` — ambos apareceram
+4. Rotacionar `DIRECTUS_DB_PASSWORD` e `NEO4J_PASSWORD` — ambos apareceram
    em texto puro na conversa em que este projeto foi criado (07-08/09/2026).
+5. Capitalização quebrada em `leads_processos_judiciais.classe` (ver achado
+   acima) — não é deste projeto, mas vale investigar em
+   `grande_vitoria_empresas_extracao` algum dia.
