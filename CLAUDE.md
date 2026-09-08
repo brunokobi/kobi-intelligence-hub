@@ -100,13 +100,20 @@ Backend deployado em `/opt/kobi-intelligence-hub` na VPS (container na
 rede `coolify`, alcançável por `http://kobi-intelligence-hub:8000` de
 qualquer outro container nessa rede, inclusive o n8n).
 
+**Frontend**: botão "🔍 Gerar dossiê com IA" integrado direto no dashboard
+público existente (`projeto_grande_vitoria_empresas`, `dashboard/
+index.html`, modal da empresa) — chama o webhook n8n direto do navegador
+(fetch, CORS já liberado), sem precisar de frontend próprio. Testado com
+Playwright contra a página real (`empresas.brunokobi.duckdns.org`):
+botão → confirm() → loading → dossiê renderizado. Como a página é
+pública, tem confirmação antes de rodar (evita clique repetido gerando
+carga à toa no Ollama compartilhado).
+
 ## Pendente
 
 1. **Tratamento de CNPJ não encontrado** no workflow n8n (hoje estoura
    erro se o backend devolver 404) — ver gotcha em `n8n/README.md`.
-2. Decidir frontend: painel React novo, ou reaproveitar componente do
-   `kobi` existente.
-3. `.venv` próprio pro backend (em vez de reaproveitar o do
+2. `.venv` próprio pro backend (em vez de reaproveitar o do
    `experimento2026` só localmente — o container já usa um `requirements.txt`
    isolado, isso é só uma pendência de dev local).
 4. Retreino periódico do modelo/scores (`experimento2026/scripts/
