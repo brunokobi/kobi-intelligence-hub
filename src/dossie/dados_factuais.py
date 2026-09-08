@@ -47,9 +47,16 @@ def buscar_sancoes(lead_id: int) -> list[dict]:
 
 
 def buscar_dividas_ativas(lead_id: int) -> list[dict]:
+    """`tipo_devedor` importa pra interpretar o valor: quando 'CORRESPONSAVEL'
+    ou 'SOLIDARIO', o valor listado é o total da dívida que TODOS os
+    corresponsáveis respondem integralmente (responsabilidade solidária) —
+    não é dívida "própria" da empresa sozinha. Sem esse campo, o dossiê
+    mostraria o mesmo valor gigante pra empresas diferentes sem contexto
+    nenhum (achado investigando um caso real em 08/09/2026 — ver
+    CLAUDE.md)."""
     with _conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT orgao, valor, situacao, data_inscricao, tipo_tributo, ajuizada "
+            "SELECT orgao, valor, situacao, data_inscricao, tipo_tributo, ajuizada, tipo_devedor "
             "FROM leads_dividas_ativas WHERE lead_id = %s", (lead_id,))
         return [dict(r) for r in cur.fetchall()]
 

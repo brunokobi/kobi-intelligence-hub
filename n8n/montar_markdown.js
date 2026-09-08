@@ -19,7 +19,10 @@ md += `**Status Cadastral:** ${emp.situacao_cadastral === '02' ? 'Ativa' : emp.s
 
 const alertas = [];
 if (original.sancoes.length) alertas.push(`${original.sancoes.length} sanção(ões) administrativa(s) registrada(s)`);
-if (original.dividas_ativas.length) alertas.push(`${original.dividas_ativas.length} inscrição(ões) em dívida ativa`);
+const dividasProprias = original.dividas_ativas.filter(x => x.tipo_devedor === 'PRINCIPAL');
+if (dividasProprias.length) alertas.push(`${dividasProprias.length} inscrição(ões) em dívida ativa própria`);
+const dividasCorresp = original.dividas_ativas.filter(x => x.tipo_devedor !== 'PRINCIPAL');
+if (dividasCorresp.length) alertas.push(`${dividasCorresp.length} inscrição(ões) por responsabilidade solidária (dívida de terceiro)`);
 if (original.processos_judiciais.length) alertas.push(`${original.processos_judiciais.length} processo(s) judicial(is) localizado(s)`);
 if (original.infracoes_ambientais.length) alertas.push(`${original.infracoes_ambientais.length} infração(ões) ambiental(is)`);
 const conexoesSancionadas = (original.rede_societaria || []).filter(c => c.sancionada_direto);
@@ -56,8 +59,16 @@ md += `\n\n`;
 
 md += `**Dívida Ativa:**\n`;
 if (original.dividas_ativas.length) {
-  const total = original.dividas_ativas.reduce((a, x) => a + (x.valor || 0), 0);
-  md += `- ⚠️ ${original.dividas_ativas.length} inscrição(ões), total acumulado ${fmtMoeda(total)}\n`;
+  const principais = original.dividas_ativas.filter(x => x.tipo_devedor === 'PRINCIPAL');
+  const corresponsaveis = original.dividas_ativas.filter(x => x.tipo_devedor !== 'PRINCIPAL');
+  if (principais.length) {
+    const totalPrincipal = principais.reduce((a, x) => a + (x.valor || 0), 0);
+    md += `- ⚠️ Dívida própria (devedor principal): ${principais.length} inscrição(ões), total ${fmtMoeda(totalPrincipal)}\n`;
+  }
+  if (corresponsaveis.length) {
+    const totalCorresp = corresponsaveis.reduce((a, x) => a + (x.valor || 0), 0);
+    md += `- ⚠️ Responsabilidade solidária/corresponsável (dívida de OUTRO devedor, não própria): ${corresponsaveis.length} inscrição(ões), total ${fmtMoeda(totalCorresp)}\n`;
+  }
 } else {
   md += `- Nenhuma dívida ativa encontrada.\n`;
 }

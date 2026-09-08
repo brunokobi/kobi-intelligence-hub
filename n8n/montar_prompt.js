@@ -8,8 +8,14 @@ linhas.push(`Município: ${emp.municipio}`);
 linhas.push(`Sócios: ${(d.socios || []).map(s => s.nome_socio).join(', ') || 'nenhum registrado'}`);
 if (d.sancoes.length) linhas.push(`Sanções administrativas (${d.sancoes.length}): ` + d.sancoes.map(s => `${s.tipo} - ${s.orgao_sancionador}`).join('; '));
 if (d.dividas_ativas.length) {
-  const total = d.dividas_ativas.reduce((a, x) => a + (x.valor || 0), 0);
-  linhas.push(`Dívida ativa (${d.dividas_ativas.length} registro(s)): total R$ ${total.toLocaleString('pt-BR')}`);
+  const principais = d.dividas_ativas.filter(x => x.tipo_devedor === 'PRINCIPAL');
+  const corresponsaveis = d.dividas_ativas.filter(x => x.tipo_devedor !== 'PRINCIPAL');
+  const totalPrincipal = principais.reduce((a, x) => a + (x.valor || 0), 0);
+  if (principais.length) linhas.push(`Dívida ativa PRÓPRIA (devedor principal, ${principais.length} registro(s)): total R$ ${totalPrincipal.toLocaleString('pt-BR')}`);
+  if (corresponsaveis.length) {
+    const totalCorresp = corresponsaveis.reduce((a, x) => a + (x.valor || 0), 0);
+    linhas.push(`Dívida ativa por RESPONSABILIDADE SOLIDÁRIA/CORRESPONSÁVEL (${corresponsaveis.length} registro(s), dívida de outro devedor pela qual esta empresa também responde legalmente): total R$ ${totalCorresp.toLocaleString('pt-BR')} — NÃO é dívida própria, avaliar com contexto`);
+  }
 }
 if (d.processos_judiciais.length) linhas.push(`Processos judiciais: ${d.processos_judiciais.length} encontrados`);
 if (d.infracoes_ambientais.length) linhas.push(`Infrações ambientais (IBAMA/IEMA): ${d.infracoes_ambientais.length}`);
@@ -28,6 +34,7 @@ if (d.score_preditivo) linhas.push(`Score de risco preditivo (modelo estatístic
 
 const prompt = `Você é um analista de compliance/due diligence especialista em risco empresarial no Brasil.
 Escreva um PARECER TÉCNICO CONSOLIDADO (parágrafo único, até 150 palavras, português do Brasil, tom formal e objetivo) sobre a empresa abaixo, avaliando o risco de contratação/parceria com base SOMENTE nos dados fornecidos. Não invente números nem fatos que não estejam listados. Se não houver nenhum alerta (sanção, dívida, processo, rede de risco), diga isso claramente e recomende prosseguir normalmente.
+IMPORTANTE sobre dívida ativa: trate "dívida PRÓPRIA (devedor principal)" e "dívida por RESPONSABILIDADE SOLIDÁRIA/CORRESPONSÁVEL" como riscos DIFERENTES — a segunda é dívida de OUTRO devedor pela qual esta empresa também pode ser cobrada (responsabilidade solidária prevista em lei), não uma dívida que a empresa contraiu. Nunca some ou confunda os dois valores nem apresente o valor solidário como se fosse dívida própria da empresa.
 
 Dados:
 ${linhas.join('\n')}`;
