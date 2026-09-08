@@ -87,15 +87,31 @@ Python encontra o `src` ERRADO (do experimento2026) em vez do daqui, e dá
 parece que o arquivo não existe, mas existe; é resolução de pacote
 colidindo entre os dois projetos que compartilham o mesmo venv.
 
+## Status (08/09/2026) — pipeline completo funcionando de ponta a ponta
+
+`POST https://n8n-brunokobi.duckdns.org/webhook/kobi-dossie {"cnpj":"..."}`
+devolve o dossiê em Markdown completo (score, cadastro, sanções, dívida
+ativa, processos, infrações ambientais, rede societária + endereço
+compartilhado, parecer técnico redigido por `llama3.1:8b` via Ollama) —
+testado contra CNPJ real. Ver `n8n/README.md` pro detalhe do workflow
+(id `Z1frcsogDSDtdI2v`, criado via API do n8n).
+
+Backend deployado em `/opt/kobi-intelligence-hub` na VPS (container na
+rede `coolify`, alcançável por `http://kobi-intelligence-hub:8000` de
+qualquer outro container nessa rede, inclusive o n8n).
+
 ## Pendente
 
-1. Workflow n8n: recebe payload do `GET /dossie/{cnpj}` → 1 chamada Ollama
-   pro parecer final (seção 4 do dossiê) → devolve o Markdown completo.
-   Avaliar se `phi3:mini` (já carregado no Ollama da VPS) dá conta da
-   qualidade de redação necessária, ou se precisa de modelo maior.
-2. Formatar o Markdown final (hoje o endpoint devolve só o JSON estruturado
-   — falta a etapa de virar isso no formato do dossiê-exemplo do README).
-3. Decidir frontend: painel React novo, ou reaproveitar componente do
+1. **Tratamento de CNPJ não encontrado** no workflow n8n (hoje estoura
+   erro se o backend devolver 404) — ver gotcha em `n8n/README.md`.
+2. Decidir frontend: painel React novo, ou reaproveitar componente do
    `kobi` existente.
-4. `.venv` próprio (em vez de reaproveitar o do `experimento2026`) —
-   avaliar quando for deployar em produção/VPS.
+3. `.venv` próprio pro backend (em vez de reaproveitar o do
+   `experimento2026` só localmente — o container já usa um `requirements.txt`
+   isolado, isso é só uma pendência de dev local).
+4. Retreino periódico do modelo/scores (`experimento2026/scripts/
+   treinar_modelo_final.py`) — hoje é manual; e re-sincronizar
+   `models/scores.csv` pro container na VPS depois de cada retreino (hoje
+   também manual, via rsync/scp).
+5. Rotacionar `DIRECTUS_DB_PASSWORD` e `NEO4J_PASSWORD` — ambos apareceram
+   em texto puro na conversa em que este projeto foi criado (07-08/09/2026).

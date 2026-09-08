@@ -5,8 +5,10 @@ partir de um CNPJ ou razão social — cadastro, sanções, dívida ativa, proce
 judiciais, rede societária (conexões via sócio comum) e um parecer redigido por
 LLM, incluindo (com ressalva metodológica) um score de risco preditivo.
 
-**Status**: planejamento — pasta criada, arquitetura definida, implementação
-ainda não começou. Ver `CLAUDE.md` pro plano técnico e decisões já tomadas.
+**Status (08/09/2026): pipeline completo funcionando de ponta a ponta**,
+testado contra dado real. `POST https://n8n-brunokobi.duckdns.org/webhook/
+kobi-dossie` com `{"cnpj": "..."}` devolve o dossiê em Markdown. Falta só
+frontend/UI (hoje só a API + workflow). Ver `CLAUDE.md` pro que falta.
 
 ## Por que isso não é um projeto do zero
 
