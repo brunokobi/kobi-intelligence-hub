@@ -10,11 +10,18 @@ import json
 
 from src import config
 
+# DOI "todas as versões" (fixo, sempre aponta pra versão mais recente do
+# preprint) — ver experimento2026/README.md, seção "Publicação / Preprint".
+ARTIGO_URL = "https://doi.org/10.5281/zenodo.21961062"
+
 RESSALVA = (
     "Score gerado por modelo de pesquisa (XGBoost, experimento2026) treinado "
     "numa base com <0,1% de empresas sancionadas. Interprete como sinal de "
     "priorização para investigação manual, não como veredito — não substitui "
-    "due diligence presencial nem decisão automatizada de crédito/contrato."
+    "due diligence presencial nem decisão automatizada de crédito/contrato. "
+    "Metodologia completa, validação estatística (30 folds, teste de "
+    "Wilcoxon) e comparação com modelos de grafo (GNN/HAN) publicadas no "
+    "preprint do autor (Zenodo, acesso aberto, CC BY 4.0)."
 )
 
 _cache: dict[str, float] | None = None
@@ -47,4 +54,9 @@ def buscar_score(cnpj: str) -> dict | None:
         nivel = "🟡 Risco Moderado"
     else:
         nivel = "🟢 Baixo Risco"
-    return {"score_0_100": score, "nivel": nivel, "ressalva_metodologica": RESSALVA}
+    return {
+        "score_0_100": score,
+        "nivel": nivel,
+        "ressalva_metodologica": RESSALVA,
+        "artigo_url": ARTIGO_URL,
+    }
