@@ -155,6 +155,55 @@ RITO ORDINáRIO"`) — dado já vem assim do Postgres/DJEN, provavelmente algum
 extração. Fora do escopo daqui (não é o dossiê que gera isso), mas fica
 registrado caso apareça de novo.
 
+## Status (12/09/2026) — score GNN + análise estrutural de rede (grafo)
+
+Duas features novas, ambas em produção, testadas de ponta a ponta contra a
+base real:
+
+1. **Score GNN ao lado do tabular** — `experimento2026/scripts/
+   treinar_modelo_final_gnn.py` treina a GNN homogênea (GraphSAGE) em modo
+   transdutivo full-graph e salva `models/gnn_final/scores_gnn.csv`.
+   `score_preditivo.py` ganhou `buscar_score_gnn()` (mesmo padrão de lookup
+   em CSV do tabular, `MODELO_GNN_DIR` com fallback). Os dois scores
+   aparecem lado a lado no dossiê (nunca um substituindo o outro) — o
+   prompt do LLM instrui explicitamente a mencionar divergência entre eles
+   como informação, não como erro.
+2. **Análise estrutural de rede** (`rede_societaria.py`): três dados novos,
+   complementares ao 1-hop (sócio/endereço direto) já existente —
+   - `buscar_centralidade()`: percentil de PageRank + betweenness
+     aproximado (RA-Brandes, `samplingSize=2000`), pré-computados em lote
+     por `experimento2026/scripts/computar_metricas_grafo_neo4j.py`
+     (Neo4j GDS, já habilitado no Neo4j da VPS). Script roda dentro de
+     `atualizar_neo4j_dinamico.sh`, logo depois do export da HIN — runtime
+     real ~17-20min (a maior parte é a agregação por comunidade + o
+     betweenness aproximado), então só é viável em lote, nunca em request.
+   - `buscar_comunidade()`: cluster Louvain (id + tamanho + % de
+     sancionadas no cluster) — mesma fonte pré-computada.
+   - `buscar_risco_indireto()`: conexão de 2-3 saltos até uma empresa
+     sancionada (sócio-do-sócio, endereço-de-quem-compartilha-endereço).
+     Ao contrário das duas acima, é calculado AO VIVO a cada request —
+     testado contra a base real, <2s até no pior caso (empresa num
+     endereço-hub com 1438 outras).
+
+   Nova seção "03 — Análise Estrutural da Rede" no `montar_html.js`, só
+   aparece se pelo menos uma métrica estiver presente (compatível com
+   dossiês antigos).
+
+**Pré-requisito de infra**: heap do Neo4j subiu de 1G pra 3G (host tem
+23GB livres, `NEO4J_server_memory_heap_max__size`/`pagecache_size` no
+docker-compose de `/opt/coolify/apps/neo4j/` na VPS — mudança feita
+direto lá, não versionada em repo nenhum). Sem isso o GDS estourava
+`MemoryPoolOutOfMemoryError` mesmo em algoritmos com estimativa de memória
+baixa (PageRank/Louvain rodam rápido, mas competem por heap com o resto
+do Neo4j).
+
+**Achado no teste end-to-end**: o prompt do LLM ficou mais longo (mais 3
+linhas + 1 parágrafo de instrução) — em empresas com perfil mais denso
+(mais conexões, mais achados), isso empurrou o "Chamar Ollama" pra estourar
+o timeout de 120s que já existia nesse node. Timeout aumentado pra 240s no
+workflow n8n (`Z1frcsogDSDtdI2v`) — não é uma regressão nova, só um
+sintoma de margem que já era apertada ficando mais visível.
+
 ## Pendente
 
 1. **Tratamento de CNPJ não encontrado** no workflow n8n (hoje estoura
