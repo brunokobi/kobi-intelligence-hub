@@ -15,6 +15,7 @@ def montar_dossie(cnpj: str) -> dict | None:
     conexoes = rede_societaria.buscar_conexoes_societarias(cnpj, factual["socios"])
     enderecos = rede_societaria.buscar_enderecos_compartilhados(cnpj)
     score = score_preditivo.buscar_score(cnpj)
+    score_gnn = score_preditivo.buscar_score_gnn(cnpj)
 
     return {
         "cnpj": cnpj,
@@ -22,4 +23,5 @@ def montar_dossie(cnpj: str) -> dict | None:
         "rede_societaria": conexoes,
         "enderecos_compartilhados": enderecos,
         "score_preditivo": score,
+        "score_gnn": score_gnn,
     }

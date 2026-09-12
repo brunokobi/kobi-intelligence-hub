@@ -30,11 +30,13 @@ if (d.enderecos_compartilhados && d.enderecos_compartilhados.hub_alto_grau) {
 } else if (d.enderecos_compartilhados && d.enderecos_compartilhados.empresas.length) {
   linhas.push(`Endereço compartilhado com ${d.enderecos_compartilhados.empresas.length} outra(s) empresa(s)`);
 }
-if (d.score_preditivo) linhas.push(`Score de risco preditivo (modelo estatístico): ${d.score_preditivo.score_0_100}/100 (${d.score_preditivo.nivel})`);
+if (d.score_preditivo) linhas.push(`Score de risco preditivo tabular (modelo estatístico, XGBoost): ${d.score_preditivo.score_0_100}/100 (${d.score_preditivo.nivel})`);
+if (d.score_gnn) linhas.push(`Score de risco preditivo por rede (GNN, usa a estrutura de conexões societárias): ${d.score_gnn.score_0_100}/100 (${d.score_gnn.nivel})`);
 
 const prompt = `Você é um analista de compliance/due diligence especialista em risco empresarial no Brasil.
 Escreva um PARECER TÉCNICO CONSOLIDADO (parágrafo único, até 150 palavras, português do Brasil, tom formal e objetivo) sobre a empresa abaixo, avaliando o risco de contratação/parceria com base SOMENTE nos dados fornecidos. Não invente números nem fatos que não estejam listados. Se não houver nenhum alerta (sanção, dívida, processo, rede de risco), diga isso claramente e recomende prosseguir normalmente.
 IMPORTANTE sobre dívida ativa: trate "dívida PRÓPRIA (devedor principal)" e "dívida por RESPONSABILIDADE SOLIDÁRIA/CORRESPONSÁVEL" como riscos DIFERENTES — a segunda é dívida de OUTRO devedor pela qual esta empresa também pode ser cobrada (responsabilidade solidária prevista em lei), não uma dívida que a empresa contraiu. Nunca some ou confunda os dois valores nem apresente o valor solidário como se fosse dívida própria da empresa.
+IMPORTANTE sobre os dois scores preditivos: são dois modelos DIFERENTES (um vê atributos da empresa, o outro vê a estrutura da rede societária) — se divergirem bastante, isso não é erro nem contradição, é informação: mencione a divergência e o que ela sugere (ex.: atributos isolados baixos mas posição de risco na rede), não escolha "o certo" entre os dois.
 
 Dados:
 ${linhas.join('\n')}`;

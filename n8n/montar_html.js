@@ -7,6 +7,7 @@ const original = $('Buscar Dossie').item.json;
 const parecer = ($json.response || '').trim();
 const emp = original.empresa;
 const scorePred = original.score_preditivo;
+const scoreGnn = original.score_gnn;
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -173,8 +174,29 @@ if (scorePred) {
 }
 
 const notaMetodologica = scorePred
-  ? `<div class="note"><span>⚠️</span><span><b>Nota metodológica:</b> ${esc(scorePred.ressalva_metodologica)}${scorePred.artigo_url ? ` Ver metodologia completa no <a href="${esc(scorePred.artigo_url)}" target="_blank" rel="noopener">artigo do autor (Zenodo, DOI ${esc(scorePred.artigo_url.replace('https://doi.org/', ''))})</a>.` : ''}</span></div>`
+  ? `<div class="note"><span>⚠️</span><span><b>Nota metodológica (score tabular):</b> ${esc(scorePred.ressalva_metodologica)}${scorePred.artigo_url ? ` Ver metodologia completa no <a href="${esc(scorePred.artigo_url)}" target="_blank" rel="noopener">artigo do autor (Zenodo, DOI ${esc(scorePred.artigo_url.replace('https://doi.org/', ''))})</a>.` : ''}</span></div>`
   : '';
+
+// ---- Card do score da GNN (rede societária) -- mostrado ao lado do
+// tabular acima, não em substituição a ele. Ausência é esperada pra
+// dossiês gerados antes de 12/09/2026 (scores_gnn.csv mais novo que o
+// tabular) -- não é erro, o card simplesmente não aparece.
+let riskCardGnnHtml = '';
+let notaMetodologicaGnn = '';
+if (scoreGnn) {
+  let nivelClasseGnn = '';
+  if (scoreGnn.score_0_100 >= 66) nivelClasseGnn = 'high';
+  else if (scoreGnn.score_0_100 >= 33) nivelClasseGnn = 'mid';
+  const larguraGnn = Math.min(100, Math.max(0, scoreGnn.score_0_100));
+  riskCardGnnHtml = `
+    <div class="risk-score-card">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">REDE (GNN)</div>
+      <div><span class="risk-score-value ${nivelClasseGnn}">${scoreGnn.score_0_100.toFixed(2)}</span><span class="risk-score-max">/100</span></div>
+      <div class="risk-score-label ${nivelClasseGnn}">${esc(scoreGnn.nivel.toUpperCase())}</div>
+      <div class="risk-bar-track"><div class="risk-bar-fill ${nivelClasseGnn}" style="width:${larguraGnn}%"></div></div>
+    </div>`;
+  notaMetodologicaGnn = `<div class="note"><span>⚠️</span><span><b>Nota metodológica (score de rede/GNN):</b> ${esc(scoreGnn.ressalva_metodologica)}</span></div>`;
+}
 
 // ---- Sócios ----
 const sociosHtml = original.socios.length
@@ -226,8 +248,10 @@ const html = `<div class="kobi-doc"><style>${css}</style>
       <h2 class="section-title">Índice de Risco</h2>
       <div class="risk-row">
         ${riskCardHtml}
+        ${riskCardGnnHtml}
         <div class="risk-details">
           ${notaMetodologica}
+          ${notaMetodologicaGnn}
           <div class="status-line">Status Cadastral: <b>${esc(situacaoLabel)} (Receita Federal)</b></div>
           <div>
             <div class="status-line" style="margin-bottom:2px;">Principais Alertas Encontrados:</div>

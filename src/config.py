@@ -31,5 +31,14 @@ _EXPERIMENTO2026_DIR = Path(os.environ.get("EXPERIMENTO2026_DIR", "/home/bruno/e
 MODELO_DIR = Path(os.environ["MODELO_DIR"]) if os.environ.get("MODELO_DIR") \
     else _EXPERIMENTO2026_DIR / "models" / "tabular_final"
 
+# Modelo GNN final: scores_gnn.csv (gerado por
+# experimento2026/scripts/treinar_modelo_final_gnn.py), adicionado em
+# 12/09/2026 ao lado do tabular acima -- mesmo padrão de override por env
+# var. Em produção, aponta pro MESMO diretório montado do tabular
+# (MODELO_GNN_DIR=/app/models) -- os dois arquivos (scores.csv e
+# scores_gnn.csv) convivem no mesmo volume, não precisa de mount novo.
+MODELO_GNN_DIR = Path(os.environ["MODELO_GNN_DIR"]) if os.environ.get("MODELO_GNN_DIR") \
+    else _EXPERIMENTO2026_DIR / "models" / "gnn_final"
+
 # n8n — workflow que chama o Ollama pra redigir o parecer final.
 N8N_WEBHOOK_PARECER = os.environ.get("N8N_WEBHOOK_PARECER", "")
