@@ -75,6 +75,79 @@ def buscar_conexoes_societarias(cnpj: str, socios_alvo: list[dict], limite_empre
 GRAU_MAXIMO_ENDERECO = 20
 
 
+def buscar_centralidade(cnpj: str) -> dict | None:
+    """Posição estrutural da empresa na rede -- percentil (0-100, maior =
+    mais central) de PageRank ("é um hub geral?") e de betweenness
+    aproximado ("é uma ponte entre grupos que senão estariam
+    desconectados?"), calculados em lote por
+    experimento2026/scripts/computar_metricas_grafo_neo4j.py (Neo4j GDS,
+    adicionado em 12/09/2026). None se as métricas ainda não foram
+    calculadas (script nunca rodou) -- não confundir com "empresa isolada",
+    que tem percentil baixo mas não None.
+    """
+    query = """
+        MATCH (e:Empresa {id: $cnpj})
+        RETURN e.centralidade_pagerank_percentil AS pagerank_percentil,
+               e.centralidade_betweenness_percentil AS betweenness_percentil
+    """
+    with _driver() as driver, driver.session(database=config.NEO4J_DATABASE) as session:
+        row = session.run(query, cnpj=cnpj).single()
+    if row is None or row["pagerank_percentil"] is None:
+        return None
+    return {
+        "pagerank_percentil": row["pagerank_percentil"],
+        "betweenness_percentil": row["betweenness_percentil"],
+    }
+
+
+def buscar_comunidade(cnpj: str) -> dict | None:
+    """Cluster (Louvain) ao qual a empresa pertence -- visão de "vizinhança"
+    da rede inteira, diferente do 1-hop (sócio/endereço direto): mostra se
+    a empresa está num grupo que, junto, concentra sanções, mesmo que ela
+    própria e seus vizinhos diretos não tenham nenhuma. Ver módulo
+    ``computar_metricas_grafo_neo4j.py`` (experimento2026)."""
+    query = """
+        MATCH (e:Empresa {id: $cnpj})
+        RETURN e.comunidade_louvain AS id_comunidade,
+               e.comunidade_tamanho AS tamanho,
+               e.comunidade_pct_sancionada AS pct_sancionada
+    """
+    with _driver() as driver, driver.session(database=config.NEO4J_DATABASE) as session:
+        row = session.run(query, cnpj=cnpj).single()
+    if row is None or row["id_comunidade"] is None:
+        return None
+    return {
+        "id_comunidade": row["id_comunidade"],
+        "tamanho": row["tamanho"],
+        "pct_sancionada": row["pct_sancionada"],
+    }
+
+
+def buscar_risco_indireto(cnpj: str, limite: int = 3) -> list[dict]:
+    """Conexões INDIRETAS (2-3 saltos) com empresas sancionadas -- ex.:
+    sócio do sócio, ou endereço de quem compartilha endereço comigo. O
+    1-hop (buscar_conexoes_societarias) não enxerga essa cadeia. Calculado
+    AO VIVO (não pré-computado como centralidade/comunidade) -- testado
+    contra a base real: <2s até no pior caso (empresa num endereço-hub com
+    1438 outras), então é rápido o bastante pra cada request de dossiê.
+    Mesmo filtro de GRAU_MAXIMO_ENDERECO do 1-hop, pelo mesmo motivo (prédio
+    comercial grande não é sinal, é ruído)."""
+    query = """
+        MATCH (alvo:Empresa {id: $cnpj})
+        MATCH path = (alvo)-[:PARTICIPA_DE|SEDIADA_EM|TEM_VINCULO_POLITICO*2..3]-(destino:Empresa)
+        WHERE destino.sancionada_direto = true AND destino.id <> $cnpj
+          AND ALL(n IN nodes(path) WHERE NOT n:Endereco OR COUNT { (n)<-[:SEDIADA_EM]-() } <= $grau_max)
+        WITH path, destino, length(path) AS dist
+        ORDER BY dist ASC
+        LIMIT $limite
+        RETURN destino.id AS cnpj_sancionada, dist AS saltos,
+               [n IN nodes(path) WHERE NOT n:Empresa | labels(n)[0]] AS tipos_intermediarios
+    """
+    with _driver() as driver, driver.session(database=config.NEO4J_DATABASE) as session:
+        resultado = session.run(query, cnpj=cnpj, grau_max=GRAU_MAXIMO_ENDERECO, limite=limite)
+        return [dict(row) for row in resultado]
+
+
 def buscar_enderecos_compartilhados(cnpj: str, limite_empresas: int = 10) -> dict:
     """Outras empresas no MESMO endereço do CNPJ alvo. Retorna também o grau
     total do endereço (quantas empresas ao todo) — acima de

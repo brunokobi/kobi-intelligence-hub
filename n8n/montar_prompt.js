@@ -32,11 +32,24 @@ if (d.enderecos_compartilhados && d.enderecos_compartilhados.hub_alto_grau) {
 }
 if (d.score_preditivo) linhas.push(`Score de risco preditivo tabular (modelo estatístico, XGBoost): ${d.score_preditivo.score_0_100}/100 (${d.score_preditivo.nivel})`);
 if (d.score_gnn) linhas.push(`Score de risco preditivo por rede (GNN, usa a estrutura de conexões societárias): ${d.score_gnn.score_0_100}/100 (${d.score_gnn.nivel})`);
+if (d.centralidade_rede) {
+  const c = d.centralidade_rede;
+  linhas.push(`Centralidade na rede societária (comparado a todas as empresas do dataset): percentil ${c.pagerank_percentil}% em importância geral (PageRank) e percentil ${c.betweenness_percentil}% como "ponte" entre grupos distintos (betweenness) -- quanto mais alto, mais central/conectada é a empresa na rede.`);
+}
+if (d.comunidade_rede) {
+  const co = d.comunidade_rede;
+  linhas.push(`Comunidade na rede (cluster #${co.id_comunidade}, detecção automática de agrupamento/Louvain): ${co.tamanho} empresa(s) no mesmo cluster, das quais ${co.pct_sancionada}% têm sanção administrativa direta.`);
+}
+if (d.risco_indireto_rede && d.risco_indireto_rede.length) {
+  const minSaltos = Math.min(...d.risco_indireto_rede.map(r => r.saltos));
+  linhas.push(`Risco indireto na rede: ${d.risco_indireto_rede.length} conexão(ões) de 2-3 graus de distância (não direta) com empresa(s) SANCIONADA(S) encontrada(s), a partir de ${minSaltos} salto(s) (ex.: sócio do sócio, ou endereço de quem compartilha endereço).`);
+}
 
 const prompt = `Você é um analista de compliance/due diligence especialista em risco empresarial no Brasil.
 Escreva um PARECER TÉCNICO CONSOLIDADO (parágrafo único, até 150 palavras, português do Brasil, tom formal e objetivo) sobre a empresa abaixo, avaliando o risco de contratação/parceria com base SOMENTE nos dados fornecidos. Não invente números nem fatos que não estejam listados. Se não houver nenhum alerta (sanção, dívida, processo, rede de risco), diga isso claramente e recomende prosseguir normalmente.
 IMPORTANTE sobre dívida ativa: trate "dívida PRÓPRIA (devedor principal)" e "dívida por RESPONSABILIDADE SOLIDÁRIA/CORRESPONSÁVEL" como riscos DIFERENTES — a segunda é dívida de OUTRO devedor pela qual esta empresa também pode ser cobrada (responsabilidade solidária prevista em lei), não uma dívida que a empresa contraiu. Nunca some ou confunda os dois valores nem apresente o valor solidário como se fosse dívida própria da empresa.
 IMPORTANTE sobre os dois scores preditivos: são dois modelos DIFERENTES (um vê atributos da empresa, o outro vê a estrutura da rede societária) — se divergirem bastante, isso não é erro nem contradição, é informação: mencione a divergência e o que ela sugere (ex.: atributos isolados baixos mas posição de risco na rede), não escolha "o certo" entre os dois.
+IMPORTANTE sobre centralidade/comunidade/risco indireto na rede: alta centralidade (PageRank/betweenness) NÃO é, sozinha, sinal de risco — holdings e grupos econômicos legítimos também são centrais na rede; mencione só como contexto estrutural, sem alarmismo. Já uma comunidade com % alta de empresas sancionadas, ou uma conexão indireta (2-3 saltos) encontrada com empresa sancionada, SÃO sinais relevantes de risco por associação e devem ser destacados no parecer.
 
 Dados:
 ${linhas.join('\n')}`;

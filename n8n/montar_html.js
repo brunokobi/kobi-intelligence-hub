@@ -214,6 +214,30 @@ if (original.enderecos_compartilhados && original.enderecos_compartilhados.hub_a
   pillEndereco = `<div class="pill-stat">🏢 Endereço compartilhado com <b>${original.enderecos_compartilhados.empresas.length} outra(s) empresa(s)</b>.</div>`;
 }
 
+// ---- Análise estrutural de rede (centralidade / comunidade / risco
+// indireto) -- Neo4j GDS, adicionado em 12/09/2026. Seção inteira só
+// aparece se pelo menos uma das três métricas estiver presente
+// (compatibilidade com dossiês antigos, gerados antes dessa feature). ----
+const centralidade = original.centralidade_rede;
+const comunidade = original.comunidade_rede;
+const riscoIndireto = original.risco_indireto_rede || [];
+
+let pillCentralidade = '';
+if (centralidade) {
+  pillCentralidade = `<div class="pill-stat">📡 Centralidade na rede: percentil <b>${centralidade.pagerank_percentil}%</b> em importância geral (PageRank) · percentil <b>${centralidade.betweenness_percentil}%</b> como ponte entre grupos (betweenness).</div>`;
+}
+let pillComunidade = '';
+if (comunidade) {
+  const alertaComunidade = comunidade.pct_sancionada >= 10 ? ' ⚠️' : '';
+  pillComunidade = `<div class="pill-stat">🧩 Cluster #${esc(comunidade.id_comunidade)} da rede: <b>${comunidade.tamanho} empresa(s)</b> no mesmo grupo, <b>${comunidade.pct_sancionada}%</b> sancionada(s)${alertaComunidade}</div>`;
+}
+let pillRiscoIndireto = '';
+if (riscoIndireto.length) {
+  const minSaltos = Math.min(...riscoIndireto.map(r => r.saltos));
+  pillRiscoIndireto = `<div class="pill-stat" style="border-color:rgba(255,107,107,0.45);">🔗⚠️ Risco indireto: <b>${riscoIndireto.length} conexão(ões)</b> com empresa(s) sancionada(s) a partir de <b>${minSaltos} salto(s)</b> de distância (não direta).</div>`;
+}
+const temAnaliseRede = pillCentralidade || pillComunidade || pillRiscoIndireto;
+
 // ---- Check-cards de auditoria ----
 function checkCard(titulo, ok, textoOk, textoIssue) {
   return `<div class="check-card ${ok ? '' : 'issue'}"><div class="ck-title">${esc(titulo)}</div><div class="ck-status">${ok ? esc(textoOk) : esc(textoIssue)}</div></div>`;
@@ -270,15 +294,20 @@ const html = `<div class="kobi-doc"><style>${css}</style>
       <table class="socios"><thead><tr><th>Sócio</th><th>CPF</th></tr></thead><tbody>${sociosHtml}</tbody></table>
       <div class="graph-note">${pillGrafo}${pillEndereco}</div>
     </section>
+    ${temAnaliseRede ? `<section>
+      <div class="section-label">03 — ANÁLISE ESTRUTURAL DA REDE</div>
+      <h2 class="section-title">Posição na Rede Societária (Grafo)</h2>
+      <div class="graph-note">${pillCentralidade}${pillComunidade}${pillRiscoIndireto}</div>
+    </section>` : ''}
     <section>
-      <div class="section-label">03 — AUDITORIA</div>
+      <div class="section-label">${temAnaliseRede ? '04' : '03'} — AUDITORIA</div>
       <h2 class="section-title">Regularidade e Passivos</h2>
       <div class="check-grid">${checkSancoes}${checkDividas}${checkInfracoes}</div>
       <div class="section-label" style="margin-top:4px;">PROCESSOS JUDICIAIS (DJEN)</div>
       <div class="process-list">${processosHtml}</div>
     </section>
     <section>
-      <div class="section-label">04 — CONCLUSÃO</div>
+      <div class="section-label">${temAnaliseRede ? '05' : '04'} — CONCLUSÃO</div>
       <h2 class="section-title">Parecer Técnico Consolidado</h2>
       <div class="parecer">
         <h3>PARECER TÉCNICO CONSOLIDADO</h3>
