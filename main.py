@@ -1,15 +1,13 @@
-"""Kobi Intelligence Hub — API dos dados brutos do dossiê de due diligence.
+"""Kobi Intelligence Hub — API do dossiê de due diligence.
 
-Retorna o JSON estruturado (dados_factuais + rede_societaria + score
-preditivo) pronto pra virar HTML — a redação do parecer final (LLM) e a
-montagem do HTML final ficam no workflow n8n (ver README.md), não aqui:
-separação deliberada (dado factual auditável de um lado, texto
-interpretativo/apresentação do outro).
+`/dossie/{cnpj}/gerar` monta o dossiê completo (dados factuais +
+rede_societaria + score preditivo + parecer via OpenRouter + HTML final) —
+substitui o workflow n8n original (Ollama local), migrado quando o backend
+foi reconstruído na `vpsrafa` (ver CLAUDE.md). `/dossie/{cnpj}` continua
+expondo só o JSON estruturado (sem parecer/HTML), útil pra debug.
 
-Também expõe o cache de dossiês já gerados (`/dossie/{cnpj}/cache`) — o
-próprio n8n consulta antes de regerar e grava depois de gerar, pra não
-reprocessar tudo (grafo + score + LLM) toda vez que alguém abre uma empresa
-já consultada.
+`/dossie/{cnpj}/cache` evita reprocessar tudo (grafo + score + LLM) toda
+vez que alguém abre uma empresa já consultada.
 
 Rodar: uvicorn main:app --reload
 """

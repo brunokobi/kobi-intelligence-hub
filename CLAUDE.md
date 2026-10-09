@@ -204,10 +204,55 @@ o timeout de 120s que já existia nesse node. Timeout aumentado pra 240s no
 workflow n8n (`Z1frcsogDSDtdI2v`) — não é uma regressão nova, só um
 sintoma de margem que já era apertada ficando mais visível.
 
+## Status (10/2026) — migração pra vpsrafa, OpenRouter, PEP + risco geográfico
+
+A `vpsbruno` (Ashburn, IP `129.213.96.52`, tudo documentado nas seções
+acima) foi reclamada pela Oracle por ociosidade em 20/09/2026 e segue sem
+voltar (aguardando capacidade ARM). O backend foi **reconstruído do zero
+na `vpsrafa`** (Frankfurt, IP `130.61.140.66`) — mudanças relevantes em
+relação a tudo descrito acima:
+
+- **Sem Directus**: a `vpsrafa` não roda Directus. Postgres e Neo4j deste
+  projeto são containers próprios (`kobi-postgres`/`kobi-neo4j`, compose
+  em `docker-compose.vpsrafa.yml`, não versionado por ter senha em texto
+  puro), populados via `grande_vitoria_empresas_extracao/scripts/
+  sync_kobi_directus.py` direto nas tabelas `leads_*` (nome do script é
+  histórico, não significa mais sincronizar *para* o Directus) e via
+  `experimento2026/scripts/atualizar_neo4j_dinamico.sh`. A decisão
+  "fonte de dado é o Directus" no topo deste arquivo vale só pro desenho
+  original (vpsbruno); em produção hoje é Postgres dedicado.
+- **Sem n8n/Ollama**: `main.py` ganhou `POST /dossie/{cnpj}/gerar`, que
+  substitui o workflow n8n inteiro (monta dados + chama LLM + monta HTML +
+  salva cache, tudo dentro do próprio FastAPI). O parecer é redigido via
+  **OpenRouter** (`src/dossie/parecer_llm.py`, modelo free tier,
+  `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` em `.env.vpsrafa`) — não depende
+  mais do Ollama local nem do `llama3.1:8b`. `montar_html.py` (Python)
+  substitui o antigo `n8n/montar_html.js`.
+- **PEP (Pessoas Expostas Politicamente)**: `dados_factuais.py` ganhou
+  `buscar_vinculos_politicos()`, lendo `leads_vinculos_politicos` (fonte
+  `PEP`, populada via API oficial do Portal da Transparência — ver
+  `grande_vitoria_empresas_extracao/README.md`). Exibido como contexto
+  neutro (nunca sanção) na pill e no prompt do parecer — instrução
+  explícita no prompt pra não tratar como red flag.
+- **Risco geográfico (município)**: `rede_societaria.py` ganhou
+  `buscar_risco_geografico()`, lendo propriedades gravadas em lote no
+  Neo4j (`experimento2026/scripts/computar_metricas_grafo_neo4j.py`, 4ª
+  métrica) — % de empresas sancionadas no mesmo município + percentil
+  entre os municípios da Grande Vitória. Tratado como contexto estrutural
+  do local, não da empresa — só destacado com ⚠️ se percentil ≥70%.
+  Nomes de PEP e registros de risco geográfico são desduplicados por
+  tupla completa (evita contar/listar a mesma pessoa ou município 2x
+  quando há mais de um registro).
+- Testado de ponta a ponta contra CNPJ real (`34028316590318`, Correios):
+  7 vínculos PEP brutos / 5 sócios únicos após dedup, risco geográfico
+  percentil 95,14% — parecer da IA tratou ambos corretamente como
+  contexto, sem alarmismo.
+
 ## Pendente
 
-1. **Tratamento de CNPJ não encontrado** no workflow n8n (hoje estoura
-   erro se o backend devolver 404) — ver gotcha em `n8n/README.md`.
+1. **Tratamento de CNPJ não encontrado** em `POST /dossie/{cnpj}/gerar`
+   (hoje é um 404 cru do FastAPI) — conferir se o dashboard trata isso
+   direito no fetch.
 2. `.venv` próprio pro backend (em vez de reaproveitar o do
    `experimento2026` só localmente — o container já usa um `requirements.txt`
    isolado, isso é só uma pendência de dev local).
@@ -215,8 +260,6 @@ sintoma de margem que já era apertada ficando mais visível.
    treinar_modelo_final.py`) — hoje é manual; e re-sincronizar
    `models/scores.csv` pro container na VPS depois de cada retreino (hoje
    também manual, via rsync/scp).
-4. Rotacionar `DIRECTUS_DB_PASSWORD` e `NEO4J_PASSWORD` — ambos apareceram
-   em texto puro na conversa em que este projeto foi criado (07-08/09/2026).
-5. Capitalização quebrada em `leads_processos_judiciais.classe` (ver achado
+4. Capitalização quebrada em `leads_processos_judiciais.classe` (ver achado
    acima) — não é deste projeto, mas vale investigar em
    `grande_vitoria_empresas_extracao` algum dia.

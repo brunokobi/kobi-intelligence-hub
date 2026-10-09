@@ -2,33 +2,35 @@
 
 Dossiê de due diligence (HTML estilizado) sobre qualquer empresa da Grande
 Vitória (ES), a partir do CNPJ — cadastro, sanções, dívida ativa, processos
-judiciais, infrações ambientais, rede societária (grafo) e um parecer técnico
-redigido por IA, incluindo um score de risco preditivo (com ressalva
+judiciais, infrações ambientais, PEP (pessoas expostas politicamente), rede
+societária (grafo, incluindo risco geográfico por município) e um parecer
+técnico redigido por IA, incluindo um score de risco preditivo (com ressalva
 metodológica obrigatória, linkando o preprint do autor). Todo dossiê gerado
 fica salvo (cache no Postgres) — reabrir a mesma empresa mostra o dossiê já
 pronto, com a data de geração e um botão pra regerar.
 
-**Status: funcionando de ponta a ponta em produção.** Já integrado como botão
-**"🔍 Gerar dossiê com IA"** no dashboard público
-[empresas.brunokobi.tech](https://empresas.brunokobi.tech) (modal de qualquer
-empresa) — sem precisar de frontend próprio.
+**Status: funcionando de ponta a ponta em produção** (VPS `vpsrafa`,
+Frankfurt). Já integrado como botão **"🔍 Gerar dossiê com IA"** no dashboard
+público [empresas.brunokobi.tech](https://empresas.brunokobi.tech) (modal de
+qualquer empresa) — sem precisar de frontend próprio.
 
 ## Como usar
 
 Via dashboard: abra qualquer empresa em [empresas.brunokobi.tech](https://empresas.brunokobi.tech)
 e clique em "Gerar dossiê com IA".
 
-Via API direto:
+Via API direto (FastAPI deste repo, sem n8n no meio desde a migração pra
+`vpsrafa` — ver `CLAUDE.md`):
 ```bash
-curl -X POST "https://n8n-brunokobi.duckdns.org/webhook/kobi-dossie" \
+curl -X POST "http://<vpsrafa>:8001/dossie/00000000000100/gerar" \
   -H "Content-Type: application/json" \
-  -d '{"cnpj": "00000000000100", "forcar": false}'
+  -d '{"forcar": false}'
 # -> {"cache": bool, "cnpj": "...", "html": "...", "gerado_em": "..."}
 # forcar:false + já tem cache -> resposta instantânea (não chama o LLM)
 # forcar:false + nunca gerou, ou forcar:true -> gera do zero (~30-90s) e salva
 
 # só checar se já existe (nunca gera nada):
-curl "https://n8n-brunokobi.duckdns.org/webhook/kobi-dossie-cache?cnpj=00000000000100"
+curl "http://<vpsrafa>:8001/dossie/00000000000100/cache"
 ```
 
 ## Por que isso não é um projeto do zero
@@ -37,30 +39,28 @@ Amarra 3 projetos já em produção do mesmo dono, sem duplicar nenhum dado ou l
 
 | Peça | Vem de onde |
 |---|---|
-| Cadastro, sócios, sanções, dívida ativa, processos judiciais, infrações ambientais | [`grande_vitoria_empresas_extracao`](https://github.com/brunokobi/grande_vitoria_empresas_extracao) → Postgres do Directus, sincronizado diariamente |
-| Rede societária (grafo: sócio em comum, endereço compartilhado) | `experimento2026` → Neo4j, atualizado diariamente |
-| Score de risco preditivo (XGBoost) | `experimento2026` — modelo da dissertação de mestrado do autor, ver seção abaixo |
-| Redação do parecer técnico | n8n + Ollama (`llama3.1:8b`) |
+| Cadastro, sócios, sanções, dívida ativa, processos judiciais, infrações ambientais, PEP | [`grande_vitoria_empresas_extracao`](https://github.com/brunokobi/grande_vitoria_empresas_extracao) → Postgres do Directus, sincronizado diariamente |
+| Rede societária (grafo: sócio em comum, endereço compartilhado, centralidade, comunidade, risco geográfico por município) | `experimento2026` → Neo4j, atualizado diariamente |
+| Score de risco preditivo (XGBoost + GNN) | `experimento2026` — modelo da dissertação de mestrado do autor, ver seção abaixo |
+| Redação do parecer técnico | OpenRouter (LLM free tier), chamado direto pelo backend |
 
 ## Arquitetura
 
 ```
 Dashboard público (botão) ──┐
-API direta (curl/webhook) ──┴─► n8n (webhook kobi-dossie)
-                                   │
-                                   ├─ GET /dossie/{cnpj} ──► FastAPI (este repo)
-                                   │                           │
-                                   │                           ├─ Postgres do Directus (dados factuais)
-                                   │                           ├─ Neo4j (rede societária, Cypher)
-                                   │                           └─ scores.csv pré-computado (score preditivo)
-                                   │
-                                   ├─ Ollama (llama3.1:8b) ──► parecer técnico
-                                   └─ monta o Markdown final ──► resposta
+API direta (curl) ──────────┴─► POST /dossie/{cnpj}/gerar ──► FastAPI (este repo)
+                                                                  │
+                                                                  ├─ Postgres do Directus (dados factuais, PEP)
+                                                                  ├─ Neo4j (rede societária + risco geográfico, Cypher)
+                                                                  ├─ scores.csv pré-computado (score preditivo)
+                                                                  ├─ OpenRouter (LLM) ──► parecer técnico
+                                                                  └─ monta o HTML final ──► resposta (+ cache no Postgres)
 ```
 
-Deployado como container na VPS (rede Docker `coolify`, ao lado do n8n e do
-Directus — sem túnel/porta pública em produção). `n8n/README.md` documenta o
-workflow completo (nós, prompt do parecer, gotchas).
+Deployado como container na VPS `vpsrafa` (Frankfurt), rede Docker própria
+(`kobi`), ao lado do Postgres/Neo4j deste projeto. Não depende mais de n8n
+nem de Ollama — essa migração aconteceu junto da reconstrução do backend na
+`vpsrafa` (ver `CLAUDE.md` pra histórico e detalhes de infra).
 
 ## O score preditivo é reaproveitamento de pesquisa real — não é um enfeite
 
@@ -86,11 +86,12 @@ presencial/decisão automatizada de crédito.
 
 ```bash
 # túnel SSH pro Postgres do Directus (não tem porta pública)
-ssh -f -N -i ~/ssh-key-2026-07-18.key -L 5433:10.0.2.11:5432 ubuntu@129.213.96.52
+ssh -f -N -i ~/ssh-key-2026-07-18.key -L 5433:10.0.2.11:5432 ubuntu@130.61.140.66
 
 cp .env.example .env   # preencher com as credenciais reais
 uvicorn main:app --reload
 # -> http://localhost:8000/dossie/{cnpj}
+# -> POST http://localhost:8000/dossie/{cnpj}/gerar  (dossiê completo, parecer incluso)
 ```
 
 Ver `CLAUDE.md` para detalhes técnicos completos (infra reaproveitada, gotchas
