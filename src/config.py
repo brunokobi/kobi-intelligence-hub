@@ -40,5 +40,11 @@ MODELO_DIR = Path(os.environ["MODELO_DIR"]) if os.environ.get("MODELO_DIR") \
 MODELO_GNN_DIR = Path(os.environ["MODELO_GNN_DIR"]) if os.environ.get("MODELO_GNN_DIR") \
     else _EXPERIMENTO2026_DIR / "models" / "gnn_final"
 
-# n8n — workflow que chama o Ollama pra redigir o parecer final.
+# n8n — workflow que chama o Ollama pra redigir o parecer final (legado,
+# não usado mais desde a migração pro OpenRouter — ver parecer_llm.py).
 N8N_WEBHOOK_PARECER = os.environ.get("N8N_WEBHOOK_PARECER", "")
+
+# OpenRouter — chama direto do backend (substitui n8n + Ollama), modelo
+# free tier por padrão.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free")

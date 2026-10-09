@@ -123,6 +123,29 @@ def buscar_comunidade(cnpj: str) -> dict | None:
     }
 
 
+def buscar_risco_geografico(cnpj: str) -> dict | None:
+    """% de empresas sancionadas no mesmo município (Grande Vitória, 7
+    municípios) + percentil entre todas as Empresas -- calculado em lote por
+    experimento2026/scripts/computar_metricas_grafo_neo4j.py (adicionado em
+    08/10/2026), mesmo padrão de buscar_comunidade. None se a métrica ainda
+    não foi calculada."""
+    query = """
+        MATCH (e:Empresa {id: $cnpj})
+        RETURN e.municipio_pct_sancionada AS pct_sancionada,
+               e.municipio_total_empresas AS total_empresas,
+               e.municipio_pct_sancionada_percentil AS percentil
+    """
+    with _driver() as driver, driver.session(database=config.NEO4J_DATABASE) as session:
+        row = session.run(query, cnpj=cnpj).single()
+    if row is None or row["pct_sancionada"] is None:
+        return None
+    return {
+        "pct_sancionada": row["pct_sancionada"],
+        "total_empresas": row["total_empresas"],
+        "percentil": row["percentil"],
+    }
+
+
 def buscar_risco_indireto(cnpj: str, limite: int = 3) -> list[dict]:
     """Conexões INDIRETAS (2-3 saltos) com empresas sancionadas -- ex.:
     sócio do sócio, ou endereço de quem compartilha endereço comigo. O

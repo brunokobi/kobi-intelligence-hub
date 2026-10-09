@@ -81,6 +81,18 @@ def buscar_processos_judiciais(lead_id: int, limite: int = 20) -> list[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
+def buscar_vinculos_politicos(lead_id: int) -> list[dict]:
+    """PEP (sócio pessoa física que ocupa/ocupou cargo público relevante) e
+    vínculos TSE (candidatura/doação) — NÃO é sanção, é só sinalizador de
+    exposição pública pra due diligence (ver experimento2026/pep_ingest.py).
+    `fonte` distingue a origem: PEP / TSE_CANDIDATURA / TSE_DOACAO / etc."""
+    with _conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT nome_socio_vinculado, fonte, cargo_ou_funcao, orgao_ou_partido, ano, "
+            "situacao, detalhe FROM leads_vinculos_politicos WHERE lead_id = %s", (lead_id,))
+        return [dict(r) for r in cur.fetchall()]
+
+
 def montar_dados_factuais(cnpj: str) -> dict | None:
     """Junta tudo num único dict pronto pra virar seção do dossiê. None se
     o CNPJ não existir na base."""
@@ -95,4 +107,5 @@ def montar_dados_factuais(cnpj: str) -> dict | None:
         "dividas_ativas": buscar_dividas_ativas(lead_id),
         "processos_judiciais": buscar_processos_judiciais(lead_id),
         "infracoes_ambientais": buscar_infracoes_ambientais(lead_id),
+        "vinculos_politicos": buscar_vinculos_politicos(lead_id),
     }
