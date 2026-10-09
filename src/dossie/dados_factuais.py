@@ -71,12 +71,20 @@ def buscar_infracoes_ambientais(lead_id: int) -> list[dict]:
 
 def buscar_processos_judiciais(lead_id: int, limite: int = 20) -> list[dict]:
     """Só os `limite` mais recentes por padrão — empresa com histórico
-    grande (ex.: milhares de processos) não deve travar o dossiê."""
+    grande (ex.: milhares de processos) não deve travar o dossiê.
+
+    Só `match_confianca='nome'` (processo em que a EMPRESA é parte,
+    casada pela razão social) -- processos com `match_confianca='socio'`
+    (achados pelo nome do sócio pessoa física) ficam de fora da due
+    diligence: nome de pessoa física tem risco de homônimo muito maior
+    que razão social, e o processo pode nem ter relação nenhuma com a
+    empresa (ver grande_vitoria_empresas_extracao/src/djen_client.py)."""
     with _conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             "SELECT numero_processo, tribunal, classe, assunto, polo, status, "
             "data_ultima_movimentacao, match_confianca FROM leads_processos_judiciais "
-            "WHERE lead_id = %s ORDER BY data_ultima_movimentacao DESC NULLS LAST LIMIT %s",
+            "WHERE lead_id = %s AND match_confianca = 'nome' "
+            "ORDER BY data_ultima_movimentacao DESC NULLS LAST LIMIT %s",
             (lead_id, limite))
         return [dict(r) for r in cur.fetchall()]
 
