@@ -7,6 +7,7 @@ from __future__ import annotations
 import requests
 
 from src import config
+from src.dossie.openrouter_fallback import obter_modelos_gratis_openrouter
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -152,24 +153,40 @@ Dados:
 
 def gerar_parecer(dados_dossie: dict) -> str:
     """Chama o OpenRouter (modelo free tier) e devolve o parecer em texto
-    puro (parágrafo único). Levanta exceção se a chamada falhar — quem
-    chama decide como tratar (ver main.py)."""
+    puro (parágrafo único). Tenta o modelo configurado primeiro; se
+    falhar (ex.: pool do modelo sobrecarregado), tenta outros modelos
+    grátis automaticamente antes de desistir. Levanta a última exceção
+    se todos falharem — quem chama decide como tratar (ver main.py)."""
     prompt = _montar_prompt(dados_dossie)
-    resp = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": config.OPENROUTER_MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-        },
-        timeout=120,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    if "choices" not in data:
-        raise RuntimeError(f"OpenRouter sem 'choices' na resposta: {data}")
-    return data["choices"][0]["message"]["content"].strip()
+
+    candidatos = [config.OPENROUTER_MODEL]
+    for m in obter_modelos_gratis_openrouter():
+        if m not in candidatos:
+            candidatos.append(m)
+
+    ultimo_erro: Exception | None = None
+    for modelo in candidatos:
+        try:
+            resp = requests.post(
+                OPENROUTER_URL,
+                headers={
+                    "Authorization": f"Bearer {config.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": modelo,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                },
+                timeout=120,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if "choices" not in data:
+                raise RuntimeError(f"OpenRouter sem 'choices' na resposta: {data}")
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            ultimo_erro = e
+            continue
+
+    raise ultimo_erro or RuntimeError("Nenhum modelo disponível")
