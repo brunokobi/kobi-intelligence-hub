@@ -42,7 +42,7 @@ CSS = """
 .kobi-doc .section-label{ font-family:var(--mono); font-size:11px; letter-spacing:0.08em; color:var(--green-dim); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
 .kobi-doc .section-label::before{ content:""; width:3px; height:12px; background:var(--green); border-radius:2px; display:inline-block; }
 .kobi-doc h2.section-title{ font-size:15px; margin:0 0 16px; color:#eafff1; font-weight:700; }
-.kobi-doc .risk-row{ display:flex; gap:20px; align-items:stretch; flex-wrap:wrap; }
+.kobi-doc .risk-row{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
 .kobi-doc .risk-score-card{ flex:0 0 180px; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:18px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
 .kobi-doc .risk-score-value{ font-family:var(--mono); font-size:36px; font-weight:700; color:var(--green); line-height:1; }
 .kobi-doc .risk-score-value.mid{ color:var(--amber); }
@@ -169,6 +169,7 @@ def montar_html(original: dict, parecer: str) -> str:
         largura = min(100, max(0, score_pred["score_0_100"]))
         risk_card_html = f"""
     <div class="risk-score-card">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">MODELO TABULAR (PESQUISA)</div>
       <div><span class="risk-score-value {nivel_classe}">{score_pred["score_0_100"]:.2f}</span><span class="risk-score-max">/100</span></div>
       <div class="risk-score-label {nivel_classe}">{esc(score_pred["nivel"].upper())}</div>
       <div class="risk-bar-track"><div class="risk-bar-fill {nivel_classe}" style="width:{largura}%"></div></div>
@@ -328,6 +329,38 @@ def montar_html(original: dict, parecer: str) -> str:
 
     badge_final = esc(score_pred["nivel"].upper()) if score_pred else "SEM SCORE"
 
+    # Nota de risco de integridade (regras explícitas) — índice PRINCIPAL desde
+    # nov/2026; os scores preditivos viram sinais auxiliares.
+    integ = original.get("avaliacao_integridade")
+    integ_card_html = ""
+    integ_fatores_html = ""
+    if integ:
+        nota = integ["nota"]
+        classe_i = "high" if nota >= 60 else ("mid" if nota >= 15 else "")
+        integ_card_html = f"""
+    <div class="risk-score-card" style="flex-basis:200px;border-width:2px;">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">INTEGRIDADE (REGRAS)</div>
+      <div><span class="risk-score-value {classe_i}">{nota}</span><span class="risk-score-max">/100</span></div>
+      <div class="risk-score-label {classe_i}">{esc(integ["nivel"].upper())}</div>
+      <div class="risk-bar-track"><div class="risk-bar-fill {classe_i}" style="width:{min(100, nota)}%"></div></div>
+    </div>"""
+        itens = "".join(
+            f'<li><b>+{f["pontos"]}</b> {esc(f["fator"])} <span style="color:var(--text-dim)">— {esc(f["fonte"])}'
+            f'{(" · " + esc(f["detalhe"])) if f.get("detalhe") else ""}'
+            f'{(" · evidência " + str(round(f["forca_evidencia"] * 100)) + "%") if f.get("forca_evidencia", 1) < 1 else ""}</span></li>'
+            for f in (integ.get("fatores") or [])[:12])
+        imped = ("<div class=\"status-line\" style=\"color:var(--red)\">⛔ Impeditivo: "
+                 + esc("; ".join(integ["impeditivos"])) + "</div>") if integ.get("impeditivos") else ""
+        integ_fatores_html = f"""
+          <div class="status-line">Diligência recomendada: <b>{esc(integ["diligencia_recomendada"])}</b></div>
+          {imped}
+          <div><div class="status-line" style="margin-bottom:2px;">Fatores da nota de integridade:</div>
+          <ul class="alert-list">{itens or "<li>Nenhum apontamento nas fontes consultadas.</li>"}</ul></div>
+          <div class="note"><span>ℹ️</span><span><b>Como a nota é calculada (v{esc(integ.get("versao") or "")}):</b> {esc(integ.get("metodologia") or "")}</span></div>"""
+        recomendacao = integ["diligencia_recomendada"]
+        badge_final = esc(integ["nivel"].upper())
+        nivel_classe = classe_i
+
     html = f"""<div class="kobi-doc"><style>{CSS}</style>
 <div class="doc">
   <div class="header">
@@ -342,9 +375,12 @@ def montar_html(original: dict, parecer: str) -> str:
       <div class="section-label">01 — RESUMO EXECUTIVO</div>
       <h2 class="section-title">Índice de Risco</h2>
       <div class="risk-row">
+        {integ_card_html}
         {risk_card_html}
         {risk_card_gnn_html}
         <div class="risk-details">
+          {integ_fatores_html}
+          {('<div class="status-line" style="margin-top:6px;">Scores preditivos (modelo de pesquisa) — sinais auxiliares de priorização:</div>' if integ and (score_pred or score_gnn) else "")}
           {nota_metodologica}
           {nota_metodologica_gnn}
           <div class="status-line">Status Cadastral: <b>{esc(situacao_label)} (Receita Federal)</b></div>

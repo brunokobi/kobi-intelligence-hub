@@ -3,7 +3,7 @@ num único dict — a "matéria-prima" do dossiê, antes da redação por LLM
 (n8n, ver README.md)."""
 from __future__ import annotations
 
-from src.dossie import dados_factuais, rede_societaria, score_preditivo
+from src.dossie import avaliacao_integridade, dados_factuais, rede_societaria, score_preditivo
 
 
 def montar_dossie(cnpj: str) -> dict | None:
@@ -20,6 +20,7 @@ def montar_dossie(cnpj: str) -> dict | None:
     risco_indireto = rede_societaria.buscar_risco_indireto(cnpj)
     score = score_preditivo.buscar_score(cnpj)
     score_gnn = score_preditivo.buscar_score_gnn(cnpj)
+    integridade = avaliacao_integridade.buscar(cnpj)
 
     return {
         "cnpj": cnpj,
@@ -32,4 +33,6 @@ def montar_dossie(cnpj: str) -> dict | None:
         "risco_indireto_rede": risco_indireto,
         "score_preditivo": score,
         "score_gnn": score_gnn,
+        "avaliacao_integridade": (integridade or {}).get("avaliacao"),
+        "ocorrencias_socios": (integridade or {}).get("ocorrencias_socios") or [],
     }

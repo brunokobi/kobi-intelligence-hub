@@ -98,6 +98,21 @@ def _montar_prompt(d: dict) -> str:
     elif enderecos and enderecos.get("empresas"):
         linhas.append(f"Endereço compartilhado com {len(enderecos['empresas'])} outra(s) empresa(s)")
 
+    integ = d.get("avaliacao_integridade")
+    if integ:
+        linhas.append(
+            f"NOTA DE RISCO DE INTEGRIDADE (regras explícitas, índice principal): {integ['nota']}/100 — "
+            f"nível {integ['nivel']}; diligência recomendada: {integ['diligencia_recomendada']}"
+        )
+        if integ.get("impeditivos"):
+            linhas.append("Impeditivos: " + "; ".join(integ["impeditivos"]))
+        for f in (integ.get("fatores") or [])[:10]:
+            forca = f.get("forca_evidencia", 1)
+            linhas.append(
+                f"- fator: {f['fator']} (+{f['pontos']} pts, fonte {f['fonte']}"
+                + (f", evidência {round(forca * 100)}% — possível correspondência" if forca < 1 else "")
+                + (f"; {f['detalhe']}" if f.get("detalhe") else "") + ")"
+            )
     score = d.get("score_preditivo")
     if score:
         linhas.append(f"Score de risco preditivo tabular (modelo estatístico, XGBoost): {score['score_0_100']}/100 ({score['nivel']})")
@@ -142,6 +157,7 @@ def _montar_prompt(d: dict) -> str:
     return f"""Você é um analista de compliance/due diligence especialista em risco empresarial no Brasil.
 Escreva um PARECER TÉCNICO CONSOLIDADO (parágrafo único, até 150 palavras, português do Brasil, tom formal e objetivo) sobre a empresa abaixo, avaliando o risco de contratação/parceria com base SOMENTE nos dados fornecidos. Não invente números nem fatos que não estejam listados. Se não houver nenhum alerta (sanção, dívida, processo, rede de risco), diga isso claramente e recomende prosseguir normalmente.
 IMPORTANTE sobre dívida ativa: trate "dívida PRÓPRIA (devedor principal)" e "dívida por RESPONSABILIDADE SOLIDÁRIA/CORRESPONSÁVEL" como riscos DIFERENTES — a segunda é dívida de OUTRO devedor pela qual esta empresa também pode ser cobrada (responsabilidade solidária prevista em lei), não uma dívida que a empresa contraiu. Nunca some ou confunda os dois valores nem apresente o valor solidário como se fosse dívida própria da empresa.
+IMPORTANTE sobre a NOTA DE RISCO DE INTEGRIDADE: é o índice principal — use o nível e a diligência recomendada dela como conclusão do parecer, citando os fatores de maior peso. Fatores com evidência abaixo de 100% vêm de cruzamento por CPF mascarado e/ou nome (possível homônimo): apresente como "possível correspondência a confirmar", nunca como fato certo. Os scores preditivos abaixo são sinais AUXILIARES de priorização.
 IMPORTANTE sobre os dois scores preditivos: são dois modelos DIFERENTES (um vê atributos da empresa, o outro vê a estrutura da rede societária) — se divergirem bastante, isso não é erro nem contradição, é informação: mencione a divergência e o que ela sugere (ex.: atributos isolados baixos mas posição de risco na rede), não escolha "o certo" entre os dois.
 IMPORTANTE sobre centralidade/comunidade/risco indireto na rede: alta centralidade (PageRank/betweenness) NÃO é, sozinha, sinal de risco — holdings e grupos econômicos legítimos também são centrais na rede; mencione só como contexto estrutural, sem alarmismo. Já uma comunidade com % alta de empresas sancionadas, ou uma conexão indireta (2-3 saltos) encontrada com empresa sancionada, SÃO sinais relevantes de risco por associação e devem ser destacados no parecer.
 IMPORTANTE sobre PEP: NÃO trate como sanção, irregularidade ou red flag — é só um sinalizador de exposição pública (a pessoa ocupa ou ocupou cargo público relevante), relevante pra avaliar conflito de interesse em contratações públicas, não um indicativo de risco de crédito/fiscal. Mencione como contexto, sem alarmismo.
